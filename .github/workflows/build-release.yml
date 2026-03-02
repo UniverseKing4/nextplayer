@@ -23,13 +23,19 @@ jobs:
         
       - run: ./gradlew assembleRelease
         
-      - name: Sign APK
+      - name: Sign APKs
         run: |
           echo "${{ secrets.SIGNING_KEY }}" | base64 -d > keystore.jks
-          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
-          $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 "$APK" app-aligned.apk
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks keystore.jks --ks-key-alias "${{ secrets.ALIAS }}" --ks-pass pass:"${{ secrets.KEY_STORE_PASSWORD }}" --key-pass pass:"${{ secrets.KEY_PASSWORD }}" --out app/build/outputs/apk/release/app-signed.apk app-aligned.apk
-          rm keystore.jks app-aligned.apk
+          mkdir -p signed
+          for APK in app/build/outputs/apk/release/*.apk; do
+            BASENAME=$(basename "$APK" .apk)
+            $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 "$APK" aligned.apk
+            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks keystore.jks --ks-key-alias "${{ secrets.ALIAS }}" --ks-pass pass:"${{ secrets.KEY_STORE_PASSWORD }}" --key-pass pass:"${{ secrets.KEY_PASSWORD }}" --out "signed/${BASENAME}.apk" aligned.apk
+            rm aligned.apk
+          done
+          rm keystore.jks
+          mv signed/* app/build/outputs/apk/release/
+          rmdir signed
         
       - uses: actions/upload-artifact@v4
         with:
